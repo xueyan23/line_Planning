@@ -1,11 +1,11 @@
 <?php 
 error_reporting(0);
 ini_set('display_errors','on');
+//設定Token 
 include('./config.php');
-//設定Token 
 $ChannelSecret = $Secret; 
-$ChannelAccessToken = $AccessToken; 
-//設定Token 
+$ChannelAccessToken = $AccessToken;
+
 const URL_IMG='https://line.jowinwin.com/line_Planning/img/';
 
 //讀取資訊 
@@ -20,7 +20,7 @@ if($HashSignature != $HeaderSignature)
     die('hash error!'); 
     exit();
 } 
- 
+$pass=['報修格式'];
 $onoff_type=true;
 $conn=connectDB();
 $G7_type= g7Type();
@@ -30,7 +30,6 @@ if(empty($DataBody['events'])){
     echo 'error';
     exit();
 } 
-
 //逐一執行事件
 foreach($DataBody['events'] as $Event)
 {
@@ -60,6 +59,9 @@ foreach($DataBody['events'] as $Event)
         }
         if($onoff_type){
             switch ($Event['message']['text']) {
+                case $pass['0']:
+                    return_mag("顧客您好\n請幫我提供以下資訊\n姓名:\n電話:\n地址:\n機型:\n機號:\n購買日期:\n訂單編號:\n購買單位:\n故障狀況:\n謝謝");
+                break;
                 case '常見問題':
                     // $msg='功能建置中...';
                     common_problem();
@@ -68,36 +70,22 @@ foreach($DataBody['events'] as $Event)
                     common_QA_form();
                     // $msg='您好，請留言您的姓名、電話及地址，並提出您需要的協助，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30';
                     break;
-                // case '液晶螢幕 常見問題':
-                //     $msg= 'https://line.jowinwin.com/line_Planning/QA.php?type=tv';
-                //     break;
-                // case '空調產品 常見問題':
-                //     $msg= 'https://line.jowinwin.com/line_Planning/QA.php';
-                //     break;
-                case '123':
-                    common_QA_kitchen();
-                    exit();
-                        break;
-                // case '商用液晶 常見問題':
-                //     $msg= 'https://line.jowinwin.com/line_Planning/QA.php?type=cd';
-                //     break;
-                // case '電冰箱 常見問題':
-                //     common_QA_ot(7);
-                //     break;
-                // case '錯誤碼':
-                // case '故障碼':
-                // case '錯誤代碼':
-                // case '故障代碼':
-                //     $msg= '查詢故障碼，請複製以下網址，至瀏覽器開啟。請勿直接點擊網址開啟，謝謝。'."\n".'http://211.75.2.121/ErrorCodeSystem/web/index.php?r=code%2Findex';
-                //     break;
                 default:
-                    $msg='';
+                
+                    $msg=otherQA($Event['message']['text']);
                     break;
                 
             }
         }
+
+        $_pass=fixMsg();
         if(!empty($msg)){
             return_mag($msg);
+        }else{
+            if(!$_pass){
+                return_mag('很抱歉現在，非服務時間，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30');
+            }
+
         }
 
         
@@ -166,6 +154,65 @@ foreach($DataBody['events'] as $Event)
     }
 }
 /**
+ * 其他問題搜尋
+ */
+function otherQA($msg){
+    $Key_box_array=[
+        [['看','家電'],['看','電器'],['實','機','店家'],['實','機','販售'],['實體','販售'],['哪','現貨'],['哪','實','機'],['哪','實體'],['哪','展售'],['看','實物'],['看','實','機'],['看','實','體'],['門市','販售'],['經銷商','展示機'],'通路'],
+        ['買遙控器','買濾心','電視腳架','電視底座','電池','水箱','充電線','冷凍櫃抽屜','旋鈕','扇葉','耗材','配件'],
+    ];
+    $ans=[
+        '顧客您好'."\n".'本公司全省皆有授權的經銷商,但不會強制經銷商,擺設某款機型現場展示,如真的要看實體機,可能要先電洽當地經銷商,是否有現貨可看,謝謝',
+        '顧客,您好'."\n".'如需購買配件可於上班時間洽詢0800-667-999#2，將由人員為您查詢及報價，謝謝您。'
+    ];
+    $return='';
+    foreach($Key_box_array as $item=>$Key_array){
+        foreach($Key_array as $_key){
+            if(is_array($_key)){
+                $_num=0;
+                foreach( $_key as $_key_s){
+                    if(strpos($msg,$_key_s) !== false){
+                        $_num++;
+                    }
+                }
+                if($_num == count($_key)){
+                    $return=$ans[$item];
+                    break 2;
+                }
+            }else{
+                if(strpos($msg,$_key) !== false){
+                    $return=$ans[$item];
+                    break 2;
+                }
+            }
+        }
+    }
+    return $return;
+
+}
+/**
+ * 報修
+ */
+function fixMsg(){
+    global $Event,$pass;
+    $key_array=[
+        '異常','故障','送修','停止運作','異音','壞了','無法開機','無法關機','沒有聲音','無畫面','代碼','短路','壞掉'
+    ];
+    if($Event['message']['text'] == $pass['0']||strpos($Event['message']['text'],'故障狀況') !== false){
+        return true;
+    }
+    foreach($key_array as $key){
+        
+        if(strpos($Event['message']['text'],$key) !== false){
+            quickReplies();
+            return true;
+        }
+    }
+    return false;
+    // return_mag('12');
+}
+
+/**
  * 取得機器種類及編號
  */
 function g7Type(){
@@ -188,6 +235,7 @@ function ansQA($text){
     while ($row = mysqli_fetch_assoc($expires_result)) {
         $key_array=explode(',',$row['key_word']);
         $_count=0;
+        $map_mid_s=false;
         foreach($key_array as $key){   
             if(strpos($text,$key) !== false){
                 $_count++;
@@ -853,9 +901,68 @@ function return_img($img){
     ];
     url_go($Payload);
 }
+function quickReplies(){
+    global $Event;
+    $user =getUser()['displayName'];
+    $Payload = [
+        'replyToken' => $Event['replyToken'],
+        'messages' => [
+            [
+                "type"=> "text", 
+                "text"=>  "{$user} 您好\n您是否需要線上報修?",
+                "quickReply"=>[     
+                    "items"=> [
+                        [
+                            "type"=> "action", 
+                            "action"=> [
+                                "uri"=> "https://liff.line.me/1656605207-Wy0nXpe5",
+                                "type"=> "uri",
+                                "label"=> "點我線上報修",
+                            ]
+                    
+                        ],
+                        [
+                            "type"=> "action", 
+                            // "imageUrl"=> "https://example.com/sushi.png",
+                            // "uri"=> "https://liff.line.me/1656605207-b4GvNYzx",
+                            // "label"=> "您是否需要線上報修?",
+                            "action"=> [
+                                // "uri"=> "https://liff.line.me/1656605207-b4GvNYzx",
+                                "type"=> "message",
+                                "label"=> "點我留下資料",
+                                "text"=> "報修格式"
+                            ]
+                    
+                        ],
+                    ]
+                ]
+            ]
+        ]
+    ];
+      url_go($Payload);
+}
 
-
-
+function getUser(){
+    global $ChannelAccessToken, $Event;
+    // 傳送訊息
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://api.line.me/v2/bot/profile/'.$Event['source']['userId']);
+    // curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    // curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    // curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    // curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($Payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $ChannelAccessToken
+    ]);
+    $Result = json_decode( curl_exec($ch),true);
+    curl_close($ch);
+    // file_put_contents('log2.txt',json_encode( $ch,320)."\n",FILE_APPEND); 
+    // var_dump($ch);
+    return $Result;
+}
 
 /**
  * Function:curl GET 請求
