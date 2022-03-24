@@ -23,7 +23,7 @@ if($HashSignature != $HeaderSignature)
 //例外
 $pass=['報修格式'];
 $onoff_type=true;
-$conn=connectDB();
+$conn=connect_DB();
 $G7_type= g7Type();
  //解析
 $DataBody=json_decode($HttpRequestBody, true);
@@ -1033,13 +1033,5 @@ function url_go($Payload){
     return $ch;
 }
 
-// function connectDB(){
-//     $dbhost = 'localhost';
-//     $dbuser = 'linejowinwin';
-//     $dbpass = 'yC125hi4Dl7y';
-//     $dbname = 'linejowi_line';
-//     $conn=mysqli_connect($dbhost, $dbuser, $dbpass, $dbname)or die('Error with MySQL connection');
-//     mysqli_set_charset($conn, "utf8");
-//     return $conn;
-// }
+
 ?>
