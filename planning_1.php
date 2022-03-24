@@ -20,6 +20,7 @@ if($HashSignature != $HeaderSignature)
     die('hash error!'); 
     exit();
 } 
+//例外
 $pass=['報修格式'];
 $onoff_type=true;
 $conn=connectDB();
@@ -33,6 +34,7 @@ if(empty($DataBody['events'])){
 //逐一執行事件
 foreach($DataBody['events'] as $Event)
 {
+    $user=new LineUser($ChannelAccessToken,$Event);
     //當bot收到任何訊息
     if($Event['type'] == 'message'){
         foreach($G7_type as $k=>$_type_array){
@@ -49,9 +51,10 @@ foreach($DataBody['events'] as $Event)
         $ans=ansQA($Event['message']['text']);
         if($ans['0']){
             if(is_array($ans['msg'])){
-                send_ans_msg( $ans['msg']);
+                $_pass=send_ans_msg( $ans['msg']);
             }else{
                 return_mag($ans['msg']);//尋不到相關問題 有種類
+                $_pass=true;
             }
             $onoff_type=false;
         }else{
@@ -77,8 +80,9 @@ foreach($DataBody['events'] as $Event)
                 
             }
         }
-
-        $_pass=fixMsg();
+        if($_pass==false){
+            $_pass=fixMsg();
+        }
         if(!empty($msg)){
             return_mag($msg);
         }else{
@@ -317,6 +321,7 @@ function ansReturn($ans){
  */
 function send_ans_msg($msg){
     global $Event,$G7_type;
+    $_temp=false;
     $Payload =array(
         'replyToken' => $Event['replyToken'],
         'messages' => array([
@@ -350,6 +355,7 @@ function send_ans_msg($msg){
                     ],
                 ];
             }
+            $_temp=true;
         }elseif($msg['0']=='一個答案'){
             $msg_data=json_decode($msg['1'],true);
             if(empty($msg_data['model'])){
@@ -369,12 +375,13 @@ function send_ans_msg($msg){
                     ],
                 ];
 
-
+                $_temp=true;
         }
         
     }
     // var_dump($Payload);
     url_go($Payload);
+    return $_temp;
 }
 
 /**棄用 */
@@ -902,14 +909,14 @@ function return_img($img){
     url_go($Payload);
 }
 function quickReplies(){
-    global $Event;
-    $user =getUser()['displayName'];
+    global $Event,$user;
+    // $user =getUser()['displayName'];
     $Payload = [
         'replyToken' => $Event['replyToken'],
         'messages' => [
             [
                 "type"=> "text", 
-                "text"=>  "{$user} 您好\n您是否需要線上報修?",
+                "text"=>  "{$user->getName()} 您好\n您是否需要線上報修?",
                 "quickReply"=>[     
                     "items"=> [
                         [
@@ -990,7 +997,7 @@ function getUser(){
 }
 
 function url_go($Payload){
-    global $ChannelAccessToken;
+    global $ChannelAccessToken,$conn,$user,$Event;
     // 傳送訊息
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, 'https://api.line.me/v2/bot/message/reply');
@@ -1006,18 +1013,33 @@ function url_go($Payload){
     ]);
     $Result = curl_exec($ch);
     curl_close($ch);
-    // file_put_contents('log2.txt',json_encode( $ch,320)."\n",FILE_APPEND); 
+    if($Payload['messages']['0']['template']['columns']){
+        $_temp='問答框:';
+        foreach($Payload['messages']['0']['template']['columns'] as $as ){
+            $_temp.=$as['text'].',';
+
+        }
+    }else{
+        $_temp=$Payload['messages']['0']['text'];
+    }
+    $msg=addslashes($Event['message']['text']);
+    if(empty($msg)){
+        $msg='點擊問答框';
+    }
     // var_dump($ch);
+    $sql="INSERT INTO `line_msg`(`uid`, `name`, `msg`, `return_msg`, `time`, `img`) VALUES ('{$user->getUid()}','{$user->getName()}','{$msg}','{$_temp}',NOW(),'{$user->getImg()}')";
+    // file_put_contents('log2.txt',$sql."\n",FILE_APPEND); 
+    mysqli_query($conn,$sql);
     return $ch;
 }
 
-function connectDB(){
-    $dbhost = 'localhost';
-    $dbuser = 'linejowinwin';
-    $dbpass = 'yC125hi4Dl7y';
-    $dbname = 'linejowi_line';
-    $conn=mysqli_connect($dbhost, $dbuser, $dbpass, $dbname)or die('Error with MySQL connection');
-    mysqli_set_charset($conn, "utf8");
-    return $conn;
-}
+// function connectDB(){
+//     $dbhost = 'localhost';
+//     $dbuser = 'linejowinwin';
+//     $dbpass = 'yC125hi4Dl7y';
+//     $dbname = 'linejowi_line';
+//     $conn=mysqli_connect($dbhost, $dbuser, $dbpass, $dbname)or die('Error with MySQL connection');
+//     mysqli_set_charset($conn, "utf8");
+//     return $conn;
+// }
 ?>
