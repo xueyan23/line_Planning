@@ -23,6 +23,7 @@ if($HashSignature != $HeaderSignature)
 } 
 //例外
 $pass=['報修格式'];
+$ALLpass=['禾聯熊蓋讚','抽獎測試'];
 $onoff_type=true;
 $conn=connect_DB();
 $G7_type= g7Type();
@@ -32,13 +33,15 @@ if(empty($DataBody['events'])){
     echo 'error';
     exit();
 } 
-
 //逐一執行事件
 foreach($DataBody['events'] as $Event)
 {
     $user=new LineUser($ChannelAccessToken,$Event);
     //當bot收到任何訊息
     if($Event['type'] == 'message'){
+        if(in_array($Event['message']['text'],$ALLpass)){
+            exit();
+        }
         foreach($G7_type as $k=>$_type_array){
             foreach($_type_array as $_type){
                 if(strpos($Event['message']['text'],$_type) !== false){
@@ -56,10 +59,15 @@ foreach($DataBody['events'] as $Event)
                 $_pass=send_ans_msg( $ans['msg']);
             }else{
                 return_mag($ans['msg']);//尋不到相關問題 有種類
-                $_pass=true;
+               
             }
             $onoff_type=false;
         }else{
+            if($ans['pass']){
+                return_mag($ans['msg']);//尋不到相關問題 有種類
+            
+            }
+            // $_pass=true;
             // return_mag($ans['msg']);//很抱歉搜尋不到您所需的相關問題
         }
         if($onoff_type){
@@ -67,11 +75,18 @@ foreach($DataBody['events'] as $Event)
                 case $pass['0']:
                     return_mag("顧客您好\n請幫我提供以下資訊\n姓名:\n電話:\n地址:\n機型:\n機號:\n購買日期:\n訂單編號:\n購買單位:\n故障狀況:\n謝謝");
                 break;
+                case '官方社群':
+                case '產品介紹':
+                case '最新活動':
+                    exit();
+                    break;
                 case '常見問題':
+                    $_pass=true;
                     // $msg='功能建置中...';
                     common_problem();
                     break;
                 case '線上諮詢':
+                    $_pass=true;
                     common_QA_form();
                     // $msg='您好，請留言您的姓名、電話及地址，並提出您需要的協助，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30';
                     break;
@@ -89,7 +104,7 @@ foreach($DataBody['events'] as $Event)
             return_mag($msg);
         }else{
             if(!$_pass){
-                return_mag('很抱歉現在，非服務時間，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30');
+                return_mag( '很抱歉，現在非服務時間，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30');
             }
 
         }
@@ -238,19 +253,24 @@ function ansQA($text){
     // $sql="SELECT b.`id`,a.`type`,b.`key_word`,b.`question`,b.`answers`,b.`model` FROM `line_type`as a JOIN `line_QA_data` as b ON b.`type`= a.`id`";//全資訊
     $sql="SELECT b.`id`,a.`type`,b.`key_word` FROM `line_type`as a JOIN `line_QA_data` as b ON b.`type`= a.`id`";
     $expires_result = mysqli_query( $conn,$sql); 
+    $_pass=false;
     while ($row = mysqli_fetch_assoc($expires_result)) {
         $key_array=explode(',',$row['key_word']);
         $_count=0;
         $map_mid_s=false;
         foreach($key_array as $key){   
             if(strpos($text,$key) !== false){
-                $_count++;
-                $map_s=['id'=>$row['id'],'type'=>$row['type'],'nob'=> $_count];
-                $_G7T=explode(',',$row['type']);
-                foreach($_G7T as $_g7){
-                    if(strpos($text,$_g7) !== false){
-                        $map_mid_s=['id'=>$row['id'],'type'=>$row['type'],'nob'=> $_count];
-                        break ;
+                if(strpos($text,"地址")!== false &&strpos($text,"電話")!== false&&strpos($text,"信箱")!==false){
+                    $_pass=true;
+                }else{
+                    $_count++;
+                    $map_s=['id'=>$row['id'],'type'=>$row['type'],'nob'=> $_count];
+                    $_G7T=explode(',',$row['type']);
+                    foreach($_G7T as $_g7){
+                        if(strpos($text,$_g7) !== false){
+                            $map_mid_s=['id'=>$row['id'],'type'=>$row['type'],'nob'=> $_count];
+                            break ;
+                        }
                     }
                 }
             }
@@ -260,12 +280,14 @@ function ansQA($text){
         if($map_mid_s){$map_mid[]=$map_mid_s;unset($map_mid_s);}
     }
     $return_array=['0'=>true,'msg'=>''];
-    if(!empty($map_mid)){ //主要答案
+    if($_pass){//報修
+        $return_array=['0'=>false,'pass'=>true,'msg'=>'感謝你的填寫，現在非服務時間，客服將在服務時間聯繫您！'."\n\n".'服務時間為：週一至週五'."\n".'上午8:30-12:00 下午13:00-17:30'];
+    }elseif(!empty($map_mid)){ //主要答案
         $return_array=['0'=>true,'msg'=>ansReturn($map_mid)];
     }elseif(!empty($map)){ //相關答案
         $return_array=['0'=>true,'msg'=>ansReturn($map)];
     }else{//找不到問題(機器種類)
-        $return_array=['0'=>false,'msg'=>'很抱歉搜尋不到您所需的相關問題'];
+        $return_array=['0'=>false,'pass'=>false,'msg'=>'很抱歉搜尋不到您所需的相關問題'];
         foreach($G7_type as $row){
                 foreach( $row as $key){
                     if(strpos($text,$key) !== false){
@@ -567,7 +589,7 @@ function send_ans_msg($msg){
                  
             ])
         );
-        url_go($Payload);
+        url_go($Payload,'產品介紹選單');
     }
     
 }
@@ -681,7 +703,7 @@ function common_problem(){
                 ]
         ])
     );
-    url_go($Payload);
+    url_go($Payload,'常見問題選單');
 }
 { //常見問題 分類聚集
     function common_QA_air(){
@@ -721,7 +743,7 @@ function common_problem(){
             ];
         }
         // var_dump(json_encode($Payload,320));
-        url_go($Payload);
+        url_go($Payload,"冷氣問題選單");
     }
     function common_QA_kitchen(){
         //    $_type=[ '咖啡機','磨豆機','熱水壺','隨行壺','電火鍋','氣炸烤箱','氣炸鍋','壓力鍋','電烤箱','洗碗機'];
@@ -782,14 +804,14 @@ function common_problem(){
             ];
         }
         // var_dump(json_encode( $Payload,320));
-        url_go($Payload);
+        url_go($Payload,$title."常見問題選單");
     }
 }
 /**
  * 常見問題各項
  */
 function common_QA_mid($i){
-    global $conn,$Event;
+    global $conn,$Event,$G7_type;
     $Payload =array(
         'replyToken' => $Event['replyToken'],
         'messages' => array([
@@ -825,7 +847,7 @@ function common_QA_mid($i){
         }
     }
     // var_dump($Payload);
-    url_go($Payload);
+    url_go($Payload,$G7_type[$i]['0']."問題選單");
 }
 
 /**
@@ -879,10 +901,10 @@ function common_QA_form(){
                 ]
         ])
     );
-    url_go($Payload);
+    url_go($Payload,'客服詢問選單');
 }
 
-function return_mag($msg){
+function return_mag($msg,$msg2=''){
     global $Event;
     $Payload = [
         'replyToken' => $Event['replyToken'],
@@ -893,7 +915,7 @@ function return_mag($msg){
             ]
         ]
     ];
-    url_go($Payload);
+    url_go($Payload,$msg2);
 }
 //video,audio
 function return_img($img){
@@ -948,7 +970,7 @@ function quickReplies(){
             ]
         ]
     ];
-      url_go($Payload);
+      url_go($Payload,'報修詢問選單');
 }
 
 function getUser(){
@@ -998,7 +1020,7 @@ function getUser(){
 
 }
 
-function url_go($Payload){
+function url_go($Payload,$msg=''){
     global $ChannelAccessToken,$conn,$user,$Event;
     // 傳送訊息
     $ch = curl_init();
@@ -1024,9 +1046,11 @@ function url_go($Payload){
     }else{
         $_temp=$Payload['messages']['0']['text'];
     }
-    $msg=addslashes($Event['message']['text']);
     if(empty($msg)){
-        $msg='點擊問答框';
+        $msg=addslashes($Event['message']['text']);
+        if(empty($msg)){
+            $msg='點擊問答框';
+        }
     }
     // var_dump($ch);
     $sql="INSERT INTO `line_msg`(`uid`, `name`, `msg`, `return_msg`, `time`, `img`) VALUES ('{$user->getUid()}','{$user->getName()}','{$msg}','{$_temp}',NOW(),'{$user->getImg()}')";
@@ -1034,5 +1058,6 @@ function url_go($Payload){
     mysqli_query($conn,$sql);
     return $ch;
 }
+
 
 ?>

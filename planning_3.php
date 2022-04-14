@@ -1,11 +1,16 @@
 <?php 
+/*
+ * @Date: 2022-04-14 08:56:06
+ * @LastEditors: 曾學彥
+ * @LastEditTime: 2022-04-14 09:16:43
+ */
 error_reporting(0);
 ini_set('display_errors','on');
 //設定Token 
 include('./config.php');
 include('./LineUser.class.php');
-$ChannelSecret = $Secret; 
-$ChannelAccessToken = $AccessToken;
+$ChannelSecret = $Secret_heran_test; 
+$ChannelAccessToken = $AccessTokent_heran_test;
 
 const URL_IMG='https://line.jowinwin.com/line_Planning/img/';
 
@@ -15,7 +20,7 @@ $HeaderSignature = isset($_SERVER['HTTP_X_LINE_SIGNATURE'])?$_SERVER['HTTP_X_LIN
 //驗證來源是否是LINE官方伺服器 
 $Hash = hash_hmac('sha256', $HttpRequestBody, $ChannelSecret, true); 
 $HashSignature = base64_encode($Hash); 
-file_put_contents('log1.txt', $HttpRequestBody."\n",FILE_APPEND); 
+file_put_contents('log3.txt', $HttpRequestBody."\n",FILE_APPEND); 
 if($HashSignature != $HeaderSignature) 
 { 
     die('hash error!'); 
